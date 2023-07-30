@@ -1,15 +1,21 @@
 package com.example.weather.service;
 
+import com.example.weather.domain.Diary;
+import com.example.weather.repository.DiaryRepository;
+import org.json.simple.JSONArray;
+import org.json.simple.JSONObject;
+import org.json.simple.parser.JSONParser;
+import org.json.simple.parser.ParseException;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
-import org.springframework.web.bind.annotation.RequestBody;
 
 import java.io.BufferedReader;
-import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.time.LocalDate;
+import java.util.HashMap;
+import java.util.Map;
 
 @Service
 public class DiaryService {
@@ -18,13 +24,28 @@ public class DiaryService {
     // 이런 변수들을 application.properties로 따로 빼는 이유 : 매직넘버를 없애는 것과 같은 원리
     @Value("${openweathermap.key}")
     private String apiKey;
+    private final DiaryRepository diaryRepository;
+
+    public DiaryService(DiaryRepository diaryRepository) {
+        this.diaryRepository = diaryRepository;
+    }
+
     public void createDiary(LocalDate date, String text){
         // open weather map에서 데이터 받아오기
         String weatherData = getWeatherString();
 
         // 받아온 날씨 json 파싱하기
+        Map<String, Object> parsedWeather = parseWeather(weatherData);
 
         // 파싱된 데이터 + 일기 값 우리 db에 저장하기
+        Diary nowDiary = new Diary();
+        nowDiary.setWeather(parsedWeather.get("main").toString());
+        nowDiary.setIcon(parsedWeather.get("icon").toString());
+        nowDiary.setTemperature((Double) parsedWeather.get("temp"));
+        nowDiary.setText(text);
+        nowDiary.setDate(date);
+
+        diaryRepository.save(nowDiary);
     }
 
     // open weather map에서 데이터 받아오기
@@ -58,5 +79,28 @@ public class DiaryService {
         } catch (Exception e){
             return e.getMessage();
         }
+    }
+
+    // 받아온 날씨 json 파싱하기
+    private Map<String, Object> parseWeather(String jsonString){
+        JSONParser jsonParser = new JSONParser();
+        JSONObject jsonObject;
+
+        // 잘못된 json인 경우를 대비한 try-catch
+        try{
+            jsonObject = (JSONObject) jsonParser.parse(jsonString);
+        } catch (ParseException e){
+            throw new RuntimeException();
+        }
+        Map<String, Object> resultMap = new HashMap<>();
+
+        JSONObject mainData = (JSONObject) jsonObject.get("main");
+        JSONArray weatherArray = (JSONArray) jsonObject.get("weather");
+        JSONObject weatherData = (JSONObject) weatherArray.get(0);
+        resultMap.put("temp", mainData.get("temp"));
+        resultMap.put("main", weatherData.get("main"));
+        resultMap.put("icon", weatherData.get("icon"));
+
+        return resultMap;
     }
 }
