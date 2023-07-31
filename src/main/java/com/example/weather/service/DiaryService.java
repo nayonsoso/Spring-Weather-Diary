@@ -8,6 +8,8 @@ import org.json.simple.parser.JSONParser;
 import org.json.simple.parser.ParseException;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
@@ -15,9 +17,11 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.time.LocalDate;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 @Service
+@Transactional
 public class DiaryService {
     // 스프링 부트에 이미 지정되어있는 변수의 값을 가져와서 apiKey에 넣어주겠다.
     // 변수를 설정하는 것은 application.properties 에서 가능
@@ -30,6 +34,7 @@ public class DiaryService {
         this.diaryRepository = diaryRepository;
     }
 
+    @Transactional(isolation = Isolation.SERIALIZABLE)
     public void createDiary(LocalDate date, String text){
         // open weather map에서 데이터 받아오기
         String weatherData = getWeatherString();
@@ -102,5 +107,31 @@ public class DiaryService {
         resultMap.put("icon", weatherData.get("icon"));
 
         return resultMap;
+    }
+
+    @Transactional(readOnly = true)
+    public List<Diary> readDiary(LocalDate date){
+        return diaryRepository.findAllByDate(date);
+    }
+
+    @Transactional(readOnly = true)
+    public List<Diary> readDiaries(LocalDate startDate, LocalDate endDate){
+        return diaryRepository.findAllByDateBetween(startDate, endDate);
+    }
+
+    public void updateDiary(LocalDate date, String text){
+        // 날짜에 해당하는 일기 중 id가 먼저 있는 것을 수정한다고 가정
+        Diary nowdiary = diaryRepository.getFirstByDate(date);
+        nowdiary.setText(text); // 내용만 바꾸고
+        diaryRepository.save(nowdiary);
+        // !주의할 것 : nowdiary는 id는 변하지 않고 text만 변했는데,
+        // 이 경우 새로운 row가 추가되는 것이 아니라 기존 데이터에 덮어씌워진다
+        // (=save가 update의 역할도 해줌)
+    }
+
+
+    public void deleteDiary(LocalDate date){
+        // 날짜에 해당하는 일기를 모두 지운다고 가정
+        diaryRepository.deleteAllByDate(date);
     }
 }
