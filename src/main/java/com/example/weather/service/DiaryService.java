@@ -1,5 +1,6 @@
 package com.example.weather.service;
 
+import com.example.weather.WeatherApplication;
 import com.example.weather.domain.DateWeather;
 import com.example.weather.domain.Diary;
 import com.example.weather.repository.DateWeatherRepository;
@@ -8,6 +9,8 @@ import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
 import org.json.simple.parser.ParseException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -33,6 +36,7 @@ public class DiaryService {
     private String apiKey;
     private final DiaryRepository diaryRepository;
     private final DateWeatherRepository dateWeatherRepository;
+    private static final Logger logger = LoggerFactory.getLogger(WeatherApplication.class);
 
     @Scheduled(cron="0 0 1 * * *") // 매일 새벽 한시마다 동작함
     public void saveWeatherDate(){
@@ -62,6 +66,8 @@ public class DiaryService {
 
     @Transactional(isolation = Isolation.SERIALIZABLE)
     public void createDiary(LocalDate date, String text){
+        logger.info("started to create diary");
+
         // 매번 api에서 받아오는 것 -> DB에 저장된 정보 받아오는 것으로 코드 변경함
         DateWeather dateWeather = getDateWeather(date);
 
@@ -71,6 +77,7 @@ public class DiaryService {
         nowDiary.setText(text);
 
         diaryRepository.save(nowDiary);
+        logger.info("end to create diary");
     }
 
     private DateWeather getDateWeather(LocalDate date){
@@ -143,6 +150,7 @@ public class DiaryService {
 
     @Transactional(readOnly = true)
     public List<Diary> readDiary(LocalDate date){
+        logger.debug("read a diary.");
         return diaryRepository.findAllByDate(date);
     }
 
